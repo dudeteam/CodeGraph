@@ -208,6 +208,11 @@ Copyright (c) 2015 DudeTeam. All rights reserved.
         _autocompleteRenderConnection: null,
 
         /**
+         * @type {Array<Number>}
+         */
+        _autocompleteSvgPosition: null,
+
+        /**
          * @type {Array<Object>}
          */
         _autocompleteModels: [],
@@ -217,6 +222,7 @@ Copyright (c) 2015 DudeTeam. All rights reserved.
          */
         start: function () {
             var editor = this;
+            var autocompleteHidden = true;
             this.set("graph", new dudeGraph.Graph());
             this.set("renderer", new dudeGraph.Renderer());
             this.set("loader", new dudeGraph.GraphLoader());
@@ -231,6 +237,15 @@ Copyright (c) 2015 DudeTeam. All rights reserved.
             _.forEach(this.get("renderBlockTypes"), function (renderBlockType) {
                 this.get("renderer").registerRenderBlock(renderBlockType.renderBlock, renderBlockType.type);
             }.bind(this));
+            this.get("renderer").on("autocomplete", function (svgPosition, position) {
+                if (autocompleteHidden) {
+                    editor.set("_autocompleteSvgPosition", svgPosition);
+                    editor.set("_autocompleteModels", editor.get("models"));
+                    editor.$["autocompletePopup"].open(position[0], position[1]);
+                    editor.$["autocomplete"].focus();
+                }
+                autocompleteHidden = !autocompleteHidden;
+            });
             this.get("renderer").on("drop-connection", function (renderConnection, __, position) {
                 var realRenderPoint = renderConnection.realRenderPoint;
                 var autocompleteModels = editor.queryModels(realRenderPoint.point.cgValueType, realRenderPoint.point.isOutput);
@@ -331,6 +346,16 @@ Copyright (c) 2015 DudeTeam. All rights reserved.
          */
         _autocomplete: function (e) {
             if (e.detail.item.data) {
+                if (this._autocompleteRenderConnection === null) {
+                    var newBlock = this.createBlock(e.detail.item.data);
+                    newBlock.nodePosition = _.clone(this._autocompleteSvgPosition);
+                    newBlock.update();
+                    this.get("renderer").clearSelection();
+                    this.get("renderer").addToSelection([newBlock]);
+                    this.get("renderer").panToFitRenderNodes([newBlock]);
+                    this.$["autocompletePopup"].close();
+                    return;
+                }
                 var draggingRenderPoint = this._autocompleteRenderConnection.draggingRenderPoint;
                 var fromRenderPoint = this._autocompleteRenderConnection.realRenderPoint;
                 var fromRenderBlock = fromRenderPoint.renderBlock;
